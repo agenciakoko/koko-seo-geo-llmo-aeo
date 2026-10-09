@@ -14,10 +14,13 @@ For this public skill, assume no integrations by default.
 
 ## Recommended Sources In This Repo
 
-Use these repo-native tools first when available:
+These work without accounts or API keys:
 
-- `seo_render_audit(url)`
-- `seo_cwv_audit(url, preset="mobile")`
+- `python3 scripts/smoke_test_url.py <url>`: page signals, `robots.txt` access per AI crawler, `llms.txt`, structured data types, author and dates, and Lighthouse through `npx` when Node is available
+- `python3 scripts/sitewide_lite_audit.py <home> --max-pages 5`
+- `python3 scripts/compare_pages.py <url-a> <url-b>`
+
+If the host environment has its own render or Core Web Vitals tools, use them as stronger technical evidence.
 
 ## External APIs
 

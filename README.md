@@ -42,7 +42,7 @@ Esta skill pode:
 - gerar um `Audit Snapshot`
 - gerar um `Public Scorecard`
 - gerar um resumo em formato de carrossel para Instagram
-- verificar sinais leves de AI search readiness, como `llms.txt`, blocos citáveis, FAQ e estrutura de listas
+- verificar sinais leves de AI search readiness: acesso dos robôs de IA no `robots.txt`, blocos citáveis, perguntas nos títulos, listas, autor e data
 
 ![Preview do compare mode](./assets/readme-compare-preview.svg)
 
@@ -85,51 +85,43 @@ Dependendo do pedido, ela também pode devolver:
 - leitura de AI citation readiness
 - resumo `sitewide-lite`
 
-## Como Instalar Localmente
+## Novidades da v1.1 (outubro de 2026)
 
-Clone o repositório:
+- Confere o `robots.txt` robô por robô: diz se o ChatGPT, o Claude, o Perplexity, o Google e o Bing conseguem ler a página, e separa robô de busca (bloqueou, sumiu daquela resposta) de robô de treino (decisão de negócio).
+- `llms.txt` deixou de valer ponto. O Google diz que não precisa de arquivo especial para aparecer nas respostas de IA ([fonte](https://developers.google.com/search/docs/appearance/ai-features)); a skill só informa se ele existe.
+- Lê autor, data de publicação e data de atualização nos dados estruturados do artigo.
+- Pesa mais esforço original e autoria real, como pede o guia de conteúdo útil do Google.
+- Funciona no Claude (app e Claude Code) e no Codex, sem ferramenta interna nenhuma.
+- Responde no idioma de quem pergunta.
+
+## Como Instalar
+
+### No Claude (claude.ai ou app)
+
+1. Baixe o arquivo [koko-seo-geo-llmo-aeo.zip](https://github.com/agenciakoko/koko-seo-geo-llmo-aeo/releases/latest/download/koko-seo-geo-llmo-aeo.zip).
+2. Em Configurações, na área de Skills, envie o ZIP e ative a skill.
+3. Abra uma conversa e peça: `Audita https://seusite.com.br para SEO, GEO, AEO e LLMO`.
+
+### No Claude Code ou no Codex
 
 ```bash
-git clone https://github.com/murilo-koko/koko-seo-geo-llmo-aeo.git
+git clone https://github.com/agenciakoko/koko-seo-geo-llmo-aeo.git
 cd koko-seo-geo-llmo-aeo
+bash install.sh          # instala nos dois
+bash install.sh claude   # só no Claude Code (~/.claude/skills)
+bash install.sh codex    # só no Codex (~/.codex/skills)
 ```
 
-Depois escolha um dos caminhos abaixo.
-
-Instalação manual:
-
-```bash
-ln -s /caminho/absoluto/para/koko-seo-geo-llmo-aeo ~/.codex/skills/koko-seo-geo-llmo-aeo
-```
-
-Instalação com script:
-
-```bash
-bash install.sh
-```
-
-Depois disso, reinicie o Codex para a skill ser carregada.
-
-Para remover o link:
-
-```bash
-bash uninstall.sh
-```
+Reinicie o app depois de instalar. Para remover: `bash uninstall.sh` (aceita os mesmos `claude` e `codex`).
 
 ## Como Usar
 
-Depois de reiniciar o Codex, abra uma nova thread e invoque a skill com:
-
-```text
-$koko-seo-geo-llmo-aeo
-```
-
-Ou use a skill diretamente dentro do prompt.
+No Claude Code, peça em português mesmo (a skill entra sozinha) ou chame `/koko-seo-geo-llmo-aeo`. No Codex, use `$koko-seo-geo-llmo-aeo`.
 
 Exemplo:
 
 ```text
-Use $koko-seo-geo-llmo-aeo to audit https://example.com for SEO, GEO, AEO, and LLMO.
+Audita https://seusite.com.br para SEO, GEO, AEO e LLMO e me diz o que corrigir primeiro.
 ```
 
 ## Prompts Recomendados
@@ -137,37 +129,37 @@ Use $koko-seo-geo-llmo-aeo to audit https://example.com for SEO, GEO, AEO, and L
 Auditar uma URL:
 
 ```text
-Use $koko-seo-geo-llmo-aeo to audit https://example.com for SEO, GEO, AEO, and LLMO. Return the Audit Snapshot, top leaks, priority roadmap, and Public Scorecard.
+Use koko-seo-geo-llmo-aeo to audit https://example.com for SEO, GEO, AEO, and LLMO. Return the Audit Snapshot, top leaks, priority roadmap, and Public Scorecard.
 ```
 
 Revisar uma landing page:
 
 ```text
-Use $koko-seo-geo-llmo-aeo to score this landing page and tell me what is leaking first.
+Use koko-seo-geo-llmo-aeo to score this landing page and tell me what is leaking first.
 ```
 
 Revisar um rascunho:
 
 ```text
-Use $koko-seo-geo-llmo-aeo to review this draft before publication. Score SEO, GEO, AEO, and LLMO, then give me the top fixes.
+Use koko-seo-geo-llmo-aeo to review this draft before publication. Score SEO, GEO, AEO, and LLMO, then give me the top fixes.
 ```
 
 Comparar páginas:
 
 ```text
-Use $koko-seo-geo-llmo-aeo to compare these URLs and tell me whether they overlap too much. I want overlap score, risk label, and what each page should own.
+Use koko-seo-geo-llmo-aeo to compare these URLs and tell me whether they overlap too much. I want overlap score, risk label, and what each page should own.
 ```
 
 Rodar `sitewide-lite`:
 
 ```text
-Use $koko-seo-geo-llmo-aeo to run a sitewide-lite audit from this homepage. Crawl a small set of internal pages and tell me the biggest structural issues first.
+Use koko-seo-geo-llmo-aeo to run a sitewide-lite audit from this homepage. Crawl a small set of internal pages and tell me the biggest structural issues first.
 ```
 
 Gerar saída para Instagram:
 
 ```text
-Use $koko-seo-geo-llmo-aeo to audit this page and also generate a Public Scorecard plus a carousel-ready summary.
+Use koko-seo-geo-llmo-aeo to audit this page and also generate a Public Scorecard plus a carousel-ready summary.
 ```
 
 ## Tutorial Rápido
@@ -177,7 +169,7 @@ Use $koko-seo-geo-llmo-aeo to audit this page and also generate a Public Scoreca
 Cole este prompt:
 
 ```text
-Use $koko-seo-geo-llmo-aeo to audit https://koko.ag/ for SEO, GEO, AEO, and LLMO.
+Use koko-seo-geo-llmo-aeo to audit https://koko.ag/ for SEO, GEO, AEO, and LLMO.
 ```
 
 ### 2. Teste de comparação
@@ -185,7 +177,7 @@ Use $koko-seo-geo-llmo-aeo to audit https://koko.ag/ for SEO, GEO, AEO, and LLMO
 Cole este prompt:
 
 ```text
-Use $koko-seo-geo-llmo-aeo to compare https://koko.ag/ and https://koko.ag/servicos and tell me whether they overlap too much.
+Use koko-seo-geo-llmo-aeo to compare https://koko.ag/ and https://koko.ag/servicos and tell me whether they overlap too much.
 ```
 
 ### 3. Teste de auditoria leve de site
@@ -193,17 +185,17 @@ Use $koko-seo-geo-llmo-aeo to compare https://koko.ag/ and https://koko.ag/servi
 Cole este prompt:
 
 ```text
-Use $koko-seo-geo-llmo-aeo to run a sitewide-lite audit from https://koko.ag/.
+Use koko-seo-geo-llmo-aeo to run a sitewide-lite audit from https://koko.ag/.
 ```
 
 ## Exemplos
 
 ### Teste técnico por terminal
 
-Se quiser validar a base técnica da skill fora do app:
+Se quiser validar a base técnica da skill fora do app (só Python 3, sem instalar nada):
 
 ```bash
-uv run python scripts/smoke_test_url.py https://koko.ag/blog/grafico-de-retencao-reels-instagram
+python3 scripts/smoke_test_url.py https://koko.ag/blog/estruturas-roteiro-reels/
 ```
 
 Comparação por terminal:
@@ -238,6 +230,7 @@ Os principais diferenciais desta skill hoje são:
 - já inclui `compare mode`
 - já inclui `sitewide-lite`
 - já inclui sinais de `AI citation readiness`
+- confere acesso de cada robô de IA no `robots.txt`
 - foi embalada para uso real, não só para benchmarking técnico
 
 ## Limites e Guardrails

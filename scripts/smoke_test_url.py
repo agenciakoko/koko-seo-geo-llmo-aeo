@@ -9,7 +9,7 @@ import subprocess
 import sys
 from urllib.parse import urlparse
 
-from lite_audit_utils import ai_citation_readiness, fetch_llms_txt_status, fetch_snapshot
+from lite_audit_utils import ai_citation_readiness, fetch_llms_txt_status, fetch_robots_ai_status, fetch_snapshot
 
 
 def run_lighthouse(url: str, preset: str = "mobile", timeout_s: int = 120) -> dict:
@@ -99,7 +99,8 @@ def main() -> int:
     snapshot = fetch_snapshot(args.url)
     lighthouse = run_lighthouse(args.url, preset=args.preset, timeout_s=120)
     llms_status = fetch_llms_txt_status(snapshot.final_url)
-    ai_readiness = ai_citation_readiness(snapshot, llms_status)
+    robots_status = fetch_robots_ai_status(snapshot.final_url)
+    ai_readiness = ai_citation_readiness(snapshot, llms_status, robots_status)
     parsed = urlparse(snapshot.final_url)
     internal_links = 0
     external_links = 0
@@ -120,6 +121,10 @@ def main() -> int:
         "meta_description_present": bool(snapshot.meta_description),
         "canonical": snapshot.canonical,
         "structured_data_count": snapshot.schema_count,
+        "structured_data_types": snapshot.schema_types,
+        "author_in_structured_data": snapshot.has_author,
+        "date_published": snapshot.date_published,
+        "date_modified": snapshot.date_modified,
         "images": {
             "total": None,
             "missing_alt": None,
@@ -136,6 +141,7 @@ def main() -> int:
         "list_count": snapshot.list_count,
         "short_paragraph_count": snapshot.short_paragraph_count,
         "faq_hint": snapshot.faq_hint,
+        "robots_ai": robots_status,
         "llms_txt": llms_status,
         "ai_citation_readiness": ai_readiness,
         "lighthouse": lighthouse,

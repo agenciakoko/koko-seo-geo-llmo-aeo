@@ -14,7 +14,9 @@ Use this skill to evaluate a live URL or draft content for four dimensions:
 - AEO: answer engine optimization, including answer-first formatting, snippet readiness, FAQs, and extraction clarity
 - LLMO: large language model optimization, including chunkability, quoteability, retrieval anchors, and semantic clarity
 
-Read [references/ai-search-readiness.md](references/ai-search-readiness.md) when you want to emphasize AI citation readiness, `llms.txt`, or passage-level reuse.
+Read [references/ai-search-readiness.md](references/ai-search-readiness.md) when you want to emphasize AI citation readiness, crawler access, or passage-level reuse.
+
+Answer in the user's language. If the user writes in Portuguese, the whole report is in Portuguese.
 
 This skill is designed to produce a professional scorecard rather than vague commentary. It should prefer real evidence over intuition, separate hard findings from model judgment, and always explain why a score was assigned.
 
@@ -52,10 +54,12 @@ Pick the strongest audit mode available:
 
 1. `url-evidence`
    Use when a live URL is available.
-   Base the analysis on rendered HTML, CWV, visible page structure, and on-page content.
-   In this repo, prefer:
-   - `seo_render_audit(url)`
-   - `seo_cwv_audit(url, preset="mobile")`
+   Base the analysis on rendered HTML, CWV, visible page structure, `robots.txt`, and on-page content.
+   Collect evidence with what the host offers:
+   - `python3 scripts/smoke_test_url.py <url>` (standard library only; adds Lighthouse through `npx` when Node is available)
+   - a web fetch tool for the page and `/robots.txt`
+   - dedicated render or Core Web Vitals tools, if the environment has them
+   If performance data cannot be collected, write `not available` and lower confidence.
 
 2. `compare-pages`
    Use when the user provides 2 to 5 URLs and wants to understand overlap, differentiation, or cannibalization-lite risk.
@@ -176,6 +180,16 @@ Rules:
 - Penalize content that is stylish but hard to extract, quote, or summarize.
 - Penalize content that depends on visual context without enough textual grounding.
 - Penalize pages that appear strong semantically but have weak crawl/index/performance evidence.
+
+## 2026 Calibration
+
+What changed since the first release, and how it affects scoring:
+
+- **No special AI files are required.** Google states that AI Overviews and AI Mode need no new machine-readable files, AI text files, markup, or special schema ([AI features and your website](https://developers.google.com/search/docs/appearance/ai-features)). Report `llms.txt` when present, never penalize its absence, and do not sell it as a ranking lever.
+- **Crawler access is the hard gate.** Check `robots.txt` for the search crawlers that feed answers: `Googlebot`, `Bingbot`, `OAI-SearchBot` (ChatGPT search), `Claude-SearchBot`, `PerplexityBot`. A blocked search crawler is a P1 blocker for that engine. Training crawlers (`GPTBot`, `ClaudeBot`, `Google-Extended`, `Applebot-Extended`, `CCBot`) are a business decision: report them, do not penalize. User-triggered fetchers (`ChatGPT-User`, `Claude-User`) may ignore `robots.txt` by design.
+- **Effort and real authorship weigh more.** Google's guidance on [generative AI content](https://developers.google.com/search/docs/fundamentals/using-gen-ai-content) and [helpful content](https://developers.google.com/search/docs/fundamentals/creating-helpful-content) rewards effort, originality and accuracy. Reward original data, first-hand experience, a named author with real credentials, and an honest note on how the content was made. Penalize mass-produced text with no original input and fabricated or generic authorship.
+- **Freshness is declared, not assumed.** Reward `datePublished` and `dateModified` in structured data and a sitemap whose `lastmod` changes when the content changes.
+- **Measure what you can.** If the user has analytics, AI assistant referrals (chatgpt.com, perplexity.ai, gemini.google.com, copilot.microsoft.com, claude.ai) are the simplest proxy for GEO results. Never invent these numbers when you do not have access.
 
 ## Machine-Readable Summary
 

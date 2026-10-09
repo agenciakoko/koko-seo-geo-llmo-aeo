@@ -4,11 +4,13 @@ This skill now treats AI search readiness as a practical layer inside the audit,
 
 ## What It Checks
 
-- `llms.txt` presence at the site root
+- `robots.txt` access for search crawlers (Googlebot, Bingbot, OAI-SearchBot, Claude-SearchBot, PerplexityBot)
+- author and date declared in structured data (articles)
 - quoteable short paragraph blocks
 - list structure that improves chunkability
-- FAQ-style headings
+- question-led or FAQ-style headings
 - structured data presence
+- `llms.txt` presence, reported as information only (not scored)
 - clean heading structure
 - enough textual substance for passage-level reuse
 
@@ -30,13 +32,14 @@ Use it as:
 
 ## Good Signs
 
+- search crawlers allowed in `robots.txt`
 - exactly one H1
 - multiple short paragraphs with standalone meaning
 - FAQ framing
 - list blocks
 - schema present
 - canonical present
-- `llms.txt` present
+- article with named author, `datePublished` and `dateModified`
 
 ## Bad Signs
 
@@ -45,4 +48,8 @@ Use it as:
 - no FAQ or answer-first blocks
 - no schema
 - no canonical
-- no `llms.txt`
+- `robots.txt` blocking OAI-SearchBot, Claude-SearchBot, PerplexityBot, Googlebot or Bingbot
+
+## About llms.txt
+
+Google says its AI features need no special files ([source](https://developers.google.com/search/docs/appearance/ai-features)), and no major answer engine has shown that it reads `llms.txt` in production retrieval. Some coding agents and assistants do read it. Treat it as optional documentation for agents, never as a fix for visibility.

@@ -11,6 +11,7 @@ from collections import deque
 from lite_audit_utils import (
     ai_citation_readiness,
     fetch_llms_txt_status,
+    fetch_robots_ai_status,
     fetch_snapshot,
     normalize_internal_links,
 )
@@ -34,6 +35,7 @@ def main() -> int:
     visited: set[str] = set()
     pages = []
     llms_status = fetch_llms_txt_status(args.url)
+    robots_status = fetch_robots_ai_status(args.url)
 
     while queue and len(pages) < max_pages:
         url = queue.popleft()
@@ -62,7 +64,7 @@ def main() -> int:
                 "h1_count": snapshot.h1_count,
                 "meta_description_present": bool(snapshot.meta_description),
                 "schema_count": snapshot.schema_count,
-                "ai_citation_readiness": ai_citation_readiness(snapshot, llms_status),
+                "ai_citation_readiness": ai_citation_readiness(snapshot, llms_status, robots_status),
                 "top_terms": snapshot.top_terms[:8],
             }
         )
@@ -92,8 +94,8 @@ def main() -> int:
         top_issues.append(f"{len(weak_structure)} page(s) do not have exactly one H1.")
     if weak_ai_readiness:
         top_issues.append(f"{len(weak_ai_readiness)} page(s) have weak AI citation readiness signals.")
-    if not llms_status.get("present"):
-        top_issues.append("llms.txt was not found at the site root.")
+    if robots_status.get("blocked_search_bots"):
+        top_issues.insert(0, "robots.txt blocks AI or search crawlers: " + ", ".join(robots_status["blocked_search_bots"]) + ".")
     if not top_issues:
         top_issues.append("No major structural issues were detected in the sampled pages.")
 
@@ -107,6 +109,7 @@ def main() -> int:
             "missing_meta_description": missing_meta,
             "weak_h1_structure": weak_structure,
             "weak_ai_citation_readiness": weak_ai_readiness,
+            "robots_ai": robots_status,
             "llms_txt": llms_status,
             "top_issues": top_issues,
         },
