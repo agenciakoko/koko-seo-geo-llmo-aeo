@@ -33,6 +33,7 @@ Bias notes:
 
 - Reward clear offer framing, objections handled in-text, proof, and retrieval-friendly sections.
 - Penalize pages that rely on visuals or slogans without enough textual specificity.
+- Product and category pages use these weights plus the product checks in the `Product Pages` section of SKILL.md (price, availability, return and shipping policy, feed, standalone product name).
 
 ## Other
 

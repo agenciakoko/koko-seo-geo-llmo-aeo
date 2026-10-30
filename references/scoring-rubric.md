@@ -81,4 +81,7 @@ Score these five sub-signals:
 - A keyword-heavy page can still score poorly if it lacks authoritative or reusable substance.
 - A technically clean page can still score poorly if its answers are vague or shallow.
 - A content-only audit should avoid over-scoring technical dimensions.
+- Formatting alone does not earn AEO or LLMO points. Google's 2026 guide says content does not need to be broken into tiny pieces; reward chunking and answer-first layout only when the blocks carry specific facts, prices, dates or answers.
+- Query coverage breadth matters more than ranking for one phrase: in an Ahrefs study (March 2026), only 37.9% of AI Overview citations came from the top 10 results.
+- `FAQPage` no longer produces rich results (retired on 07/05/2026). Score it as machine-readable structure, not as a SERP feature.
 

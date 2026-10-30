@@ -85,6 +85,17 @@ Dependendo do pedido, ela também pode devolver:
 - leitura de AI citation readiness
 - resumo `sitewide-lite`
 
+## Novidades da v1.2 (30 de outubro de 2026)
+
+- Mais robôs de busca de IA no `robots.txt`: Applebot (Siri, Spotlight e Safari; segue as regras do Googlebot quando não é citado), Amzn-SearchBot (Alexa) e meta-webindexer (Meta AI). Robôs de treino da Amazon e da Meta entram na lista de decisão de negócio.
+- Avisa quando o site está atrás da Cloudflare: desde 15/09/2026, o "Block" de robôs de IA de lá barra também o Googlebot, e isso não aparece no `robots.txt`.
+- Lê o sinal novo de "não treinar" (`User-agent: __usage_ai-training`) e o `ai-grounding:disallow` do Bing, que tira a página das respostas do Copilot.
+- Lê `noindex` na página e no cabeçalho `X-Robots-Tag`.
+- Conta imagens sem `alt` e com `alt` vazio.
+- Segue o guia novo do Google para IA na busca: formatação sozinha não sobe nota; preço, data, fatos e perguntas vizinhas sobem. FAQ deixou de ser resultado rico (07/05/2026).
+- Checagens de página de produto: preço, disponibilidade, troca e frete, nome do produto que se sustenta sozinho e feed no Merchant Center. Compra dentro das IAs aparece como "acompanhar", porque não existe fora dos EUA.
+- Medição: o relatório de IA do Search Console e o do Bing Webmaster Tools; o canal "AI Assistant" do GA4 não inclui o AI Mode.
+
 ## Novidades da v1.1 (outubro de 2026)
 
 - Confere o `robots.txt` robô por robô: diz se o ChatGPT, o Claude, o Perplexity, o Google e o Bing conseguem ler a página, e separa robô de busca (bloqueou, sumiu daquela resposta) de robô de treino (decisão de negócio).

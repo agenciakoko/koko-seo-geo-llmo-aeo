@@ -16,7 +16,7 @@ For this public skill, assume no integrations by default.
 
 These work without accounts or API keys:
 
-- `python3 scripts/smoke_test_url.py <url>`: page signals, `robots.txt` access per AI crawler, `llms.txt`, structured data types, author and dates, and Lighthouse through `npx` when Node is available
+- `python3 scripts/smoke_test_url.py <url>`: page signals, `robots.txt` access per AI crawler, the training opt-out signal, Cloudflare in front of the site, meta robots and `X-Robots-Tag`, image alt counts, `llms.txt`, structured data types, author and dates, and Lighthouse through `npx` when Node is available
 - `python3 scripts/sitewide_lite_audit.py <home> --max-pages 5`
 - `python3 scripts/compare_pages.py <url-a> <url-b>`
 
@@ -30,6 +30,10 @@ Useful examples:
 
 - Google PageSpeed Insights or CrUX
   Use when you need external field data or lab performance outside the current tooling.
+- Google Search Console
+  The generative AI report (impressions in AI Overviews, AI Mode and Discover AI, since 31/08/2026) and the "Search generative AI" control in Settings.
+- Bing Webmaster Tools
+  The AI performance report shows when Copilot cites the site, which pages, and the queries behind each citation.
 - SERP APIs
   Use when the user wants competitive benchmarking, SERP feature visibility, or intent gap analysis.
 - Crawl or corpus APIs

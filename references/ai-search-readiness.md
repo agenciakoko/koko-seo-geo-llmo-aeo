@@ -4,7 +4,11 @@ This skill now treats AI search readiness as a practical layer inside the audit,
 
 ## What It Checks
 
-- `robots.txt` access for search crawlers (Googlebot, Bingbot, OAI-SearchBot, Claude-SearchBot, PerplexityBot)
+- `robots.txt` access for search crawlers (Googlebot, Bingbot, OAI-SearchBot, Claude-SearchBot, PerplexityBot, Applebot, Amzn-SearchBot, meta-webindexer)
+- the training opt-out group `User-agent: __usage_ai-training`, reported as a business decision
+- page-level `noindex` and Bing `ai-grounding:disallow` (meta robots or `X-Robots-Tag`)
+- whether the site sits behind Cloudflare, whose AI-crawler "Block" also blocks Googlebot since 15/09/2026
+- images without `alt`, and content photos with an empty one
 - author and date declared in structured data (articles)
 - quoteable short paragraph blocks
 - list structure that improves chunkability
@@ -48,8 +52,11 @@ Use it as:
 - no FAQ or answer-first blocks
 - no schema
 - no canonical
-- `robots.txt` blocking OAI-SearchBot, Claude-SearchBot, PerplexityBot, Googlebot or Bingbot
+- `robots.txt` blocking any search crawler (OAI-SearchBot, Claude-SearchBot, PerplexityBot, Googlebot, Bingbot, Applebot, Amzn-SearchBot, meta-webindexer)
+- `ai-grounding:disallow` on a page that should appear in Copilot
+- Cloudflare "Block" enabled for AI crawlers (it takes Googlebot with it)
+- the site excluded from "Search generative AI" in Search Console
 
 ## About llms.txt
 
-Google says its AI features need no special files ([source](https://developers.google.com/search/docs/appearance/ai-features)), and no major answer engine has shown that it reads `llms.txt` in production retrieval. Some coding agents and assistants do read it. Treat it as optional documentation for agents, never as a fix for visibility.
+Google says its AI features need no special files and that Google Search does not use `llms.txt` ([source](https://developers.google.com/search/docs/fundamentals/ai-optimization-guide)), and no major answer engine has shown that it reads the file in production retrieval. Some coding agents and assistants do read it. Treat it as optional documentation for agents, never as a fix for visibility.

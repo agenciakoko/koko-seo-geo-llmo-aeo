@@ -126,9 +126,12 @@ def main() -> int:
         "date_published": snapshot.date_published,
         "date_modified": snapshot.date_modified,
         "images": {
-            "total": None,
-            "missing_alt": None,
+            "total": snapshot.image_count,
+            "missing_alt": snapshot.images_missing_alt,
+            "empty_alt": snapshot.images_empty_alt,
+            "note": "empty alt is right for decorative images and wrong for content photos: look at which ones",
         },
+        "robots_directives": snapshot.robots_directives,
         "links": {
             "internal": internal_links,
             "external": external_links,

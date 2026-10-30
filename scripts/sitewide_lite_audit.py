@@ -64,6 +64,12 @@ def main() -> int:
                 "h1_count": snapshot.h1_count,
                 "meta_description_present": bool(snapshot.meta_description),
                 "schema_count": snapshot.schema_count,
+                "images": {
+                    "total": snapshot.image_count,
+                    "missing_alt": snapshot.images_missing_alt,
+                    "empty_alt": snapshot.images_empty_alt,
+                },
+                "robots_directives": snapshot.robots_directives,
                 "ai_citation_readiness": ai_citation_readiness(snapshot, llms_status, robots_status),
                 "top_terms": snapshot.top_terms[:8],
             }
@@ -77,6 +83,12 @@ def main() -> int:
     thin_pages = [page["url"] for page in pages if page.get("word_count", 0) and page.get("word_count", 0) < 250]
     missing_meta = [page["url"] for page in pages if page.get("status_code") == 200 and not page.get("meta_description_present")]
     weak_structure = [page["url"] for page in pages if page.get("status_code") == 200 and page.get("h1_count", 0) != 1]
+    noindex_pages = [
+        page["url"]
+        for page in pages
+        if any(d.endswith(("noindex", "none")) for d in page.get("robots_directives") or [])
+    ]
+    missing_alt_pages = [page["url"] for page in pages if page.get("images", {}).get("missing_alt")]
     weak_ai_readiness = [
         page["url"]
         for page in pages
@@ -92,6 +104,10 @@ def main() -> int:
         top_issues.append(f"{len(missing_meta)} page(s) are missing a meta description.")
     if weak_structure:
         top_issues.append(f"{len(weak_structure)} page(s) do not have exactly one H1.")
+    if noindex_pages:
+        top_issues.insert(0, f"{len(noindex_pages)} page(s) ask not to be indexed (meta robots or X-Robots-Tag).")
+    if missing_alt_pages:
+        top_issues.append(f"{len(missing_alt_pages)} page(s) have images without an alt attribute.")
     if weak_ai_readiness:
         top_issues.append(f"{len(weak_ai_readiness)} page(s) have weak AI citation readiness signals.")
     if robots_status.get("blocked_search_bots"):
@@ -109,6 +125,8 @@ def main() -> int:
             "missing_meta_description": missing_meta,
             "weak_h1_structure": weak_structure,
             "weak_ai_citation_readiness": weak_ai_readiness,
+            "noindex_pages": noindex_pages,
+            "pages_with_images_missing_alt": missing_alt_pages,
             "robots_ai": robots_status,
             "llms_txt": llms_status,
             "top_issues": top_issues,

@@ -53,6 +53,10 @@ class PageSnapshot:
     has_author: bool
     date_modified: str
     date_published: str
+    image_count: int = 0
+    images_missing_alt: int = 0
+    images_empty_alt: int = 0
+    robots_directives: list[str] | None = None
 
 
 # Crawlers that decide whether a page can show up (and be cited) in a search or answer product.
@@ -62,6 +66,9 @@ SEARCH_BOTS = {
     "OAI-SearchBot": "ChatGPT search",
     "Claude-SearchBot": "Claude search",
     "PerplexityBot": "Perplexity",
+    "Applebot": "Siri, Spotlight and Safari",
+    "Amzn-SearchBot": "Alexa",
+    "meta-webindexer": "Meta AI",
 }
 # Crawlers that collect content for model training. Blocking them is a business choice, not a visibility fix.
 TRAINING_BOTS = {
@@ -70,13 +77,25 @@ TRAINING_BOTS = {
     "Google-Extended": "Gemini training and grounding (not Google Search)",
     "Applebot-Extended": "Apple model training",
     "CCBot": "Common Crawl",
+    "Amazonbot": "Amazon model training",
+    "meta-externalagent": "Meta model training",
 }
-# Fetchers triggered by a user inside the assistant. Vendors say robots.txt may not apply to them.
+# Fetchers triggered by a user inside the assistant. OpenAI, Perplexity, Amazon and Meta say robots.txt
+# may not apply to them; Anthropic says Claude-User respects it.
 USER_FETCHERS = {
     "ChatGPT-User": "a ChatGPT user asked about the page",
     "Claude-User": "a Claude user asked about the page",
     "Perplexity-User": "a Perplexity user asked about the page",
+    "Amzn-User": "an Alexa user asked about the page",
+    "meta-externalfetcher": "a Meta AI user asked about the page",
 }
+# Ad review crawlers: blocking them only matters if the site advertises on that surface.
+AD_BOTS = {
+    "OAI-AdsBot": "ChatGPT ads landing-page review",
+}
+# One robots.txt group that opts out of AI training across vendors (IETF draft, 30/10/2026).
+# `User-agent: *` does not cover it: only an explicit group counts.
+TRAINING_SIGNAL_AGENT = "__usage_ai-training"
 
 
 class AuditHTMLParser(HTMLParser):
@@ -111,6 +130,10 @@ class AuditHTMLParser(HTMLParser):
         self.has_author = False
         self.date_modified = ""
         self.date_published = ""
+        self.image_count = 0
+        self.images_missing_alt = 0
+        self.images_empty_alt = 0
+        self.robots_directives: list[str] = []
 
     def _read_ldjson(self, raw: str) -> None:
         try:
@@ -160,6 +183,19 @@ class AuditHTMLParser(HTMLParser):
             self.list_count += 1
         if tag == "meta" and attr_map.get("name", "").lower() == "description":
             self.meta_description = (attr_map.get("content") or "").strip()
+        if tag == "meta" and (attr_map.get("name") or "").lower() in {"robots", "googlebot", "bingbot"}:
+            for directive in (attr_map.get("content") or "").lower().split(","):
+                if directive.strip():
+                    self.robots_directives.append(f"{attr_map['name'].lower()}: {directive.strip()}")
+        if tag == "img" and self._ignore_depth == 0:
+            self.image_count += 1
+            if "alt" not in attr_map:
+                self.images_missing_alt += 1
+            elif not (attr_map.get("alt") or "").strip():
+                self.images_empty_alt += 1
+            elif self._in_h1:
+                # an image inside the H1 gives the heading its text (Google reads the alt)
+                self._current_h1.append(attr_map["alt"].strip())
         if tag == "link" and attr_map.get("rel", "").lower() == "canonical":
             self.canonical = (attr_map.get("href") or "").strip()
         if tag == "a" and attr_map.get("href"):
@@ -268,6 +304,7 @@ def fetch_snapshot(url: str, timeout: int = 20) -> PageSnapshot:
     with urlopen(request, timeout=timeout) as response:
         final_url = response.geturl()
         status_code = getattr(response, "status", 200)
+        x_robots = response.headers.get("X-Robots-Tag", "")
         html = response.read().decode("utf-8", errors="replace")
 
     parser = AuditHTMLParser()
@@ -299,6 +336,11 @@ def fetch_snapshot(url: str, timeout: int = 20) -> PageSnapshot:
         has_author=parser.has_author,
         date_modified=parser.date_modified,
         date_published=parser.date_published,
+        image_count=parser.image_count,
+        images_missing_alt=parser.images_missing_alt,
+        images_empty_alt=parser.images_empty_alt,
+        robots_directives=parser.robots_directives
+        + [f"x-robots-tag: {d.strip().lower()}" for d in x_robots.split(",") if d.strip()],
     )
 
 
@@ -369,12 +411,14 @@ def fetch_robots_ai_status(url: str, timeout: int = 10) -> dict:
     parsed = urlparse(url)
     robots_url = f"{parsed.scheme}://{parsed.netloc}/robots.txt"
     request = Request(robots_url, headers={"User-Agent": USER_AGENT})
+    headers = {}
     try:
         with urlopen(request, timeout=timeout) as response:
             status_code = getattr(response, "status", 200)
+            headers = response.headers
             lines = response.read().decode("utf-8", errors="replace").splitlines()
     except HTTPError as exc:
-        status_code, lines = exc.code, []
+        status_code, lines, headers = exc.code, [], exc.headers or {}
     except URLError:
         return {"url": robots_url, "present": False, "status_code": 0, "note": "robots.txt could not be fetched"}
 
@@ -384,12 +428,26 @@ def fetch_robots_ai_status(url: str, timeout: int = 10) -> dict:
         rules.disallow_all = True  # same reading Google applies to an unauthorized robots.txt
     target = url
 
+    named = {
+        match.group(1).strip().lower()
+        for match in (re.match(r"\s*user-agent\s*:\s*(\S+)", line, re.I) for line in lines)
+        if match
+    }
+
     def allowed(bots: dict) -> dict:
-        return {name: rules.can_fetch(name, target) for name in bots}
+        result = {name: rules.can_fetch(name, target) for name in bots}
+        # Apple: when robots.txt does not name Applebot, it follows the rules given to Googlebot
+        if "Applebot" in result and "applebot" not in named:
+            result["Applebot"] = rules.can_fetch("Googlebot", target)
+        return result
 
     search = allowed(SEARCH_BOTS)
     training = allowed(TRAINING_BOTS)
     fetchers = allowed(USER_FETCHERS)
+    ads = allowed(AD_BOTS)
+    signal_present = TRAINING_SIGNAL_AGENT in named
+    text = "\n".join(lines)
+    server = str(headers.get("Server", "")).lower() if headers else ""
     return {
         "url": robots_url,
         "present": status_code == 200 and bool(lines),
@@ -397,8 +455,19 @@ def fetch_robots_ai_status(url: str, timeout: int = 10) -> dict:
         "search_bots": search,
         "training_bots": training,
         "user_fetchers": fetchers,
+        "ad_bots": ads,
         "blocked_search_bots": [name for name, ok in search.items() if not ok],
         "blocked_training_bots": [name for name, ok in training.items() if not ok],
+        "ai_training_signal": {
+            "present": signal_present,
+            "training_allowed": rules.can_fetch(TRAINING_SIGNAL_AGENT, target) if signal_present else None,
+        },
+        "cloudflare": {
+            "proxied": bool(headers and (headers.get("CF-RAY") or server == "cloudflare")),
+            "bot_preference_sync": "BEGIN Cloudflare Bot Preference Sync" in text,
+            "note": "Since 15/09/2026 Cloudflare's Block options for AI crawlers also block Googlebot, Bingbot and "
+            "Applebot by IP. robots.txt cannot show that: check the dashboard or Search Console URL inspection.",
+        },
     }
 
 
@@ -422,7 +491,13 @@ def ai_citation_readiness(
         issues.append(f"robots.txt blocks {', '.join(blocked)}: the page cannot be retrieved or cited in {where}.")
     elif robots_status and "search_bots" in robots_status:
         score += 10
-        signals.append("robots.txt lets the search crawlers of Google, Bing, ChatGPT, Claude and Perplexity in.")
+        signals.append("robots.txt lets the search crawlers of Google, Bing, ChatGPT, Claude, Perplexity, Apple, Amazon and Meta in.")
+
+    directives = snapshot.robots_directives or []
+    if any(d.endswith("noindex") or d.endswith("none") for d in directives):
+        issues.append("The page asks not to be indexed (" + "; ".join(directives) + "): it cannot be shown or cited.")
+    if any("ai-grounding:disallow" in d for d in directives):
+        issues.append("The page opts out of AI grounding on Bing (ai-grounding:disallow): Copilot answers will not use it.")
 
     if snapshot.h1_count == 1:
         score += 10
