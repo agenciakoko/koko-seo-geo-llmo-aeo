@@ -9,7 +9,13 @@ import subprocess
 import sys
 from urllib.parse import urlparse
 
-from lite_audit_utils import ai_citation_readiness, fetch_llms_txt_status, fetch_robots_ai_status, fetch_snapshot
+from lite_audit_utils import (
+    ai_citation_readiness,
+    check_canonical,
+    fetch_llms_txt_status,
+    fetch_robots_ai_status,
+    fetch_snapshot,
+)
 
 
 def run_lighthouse(url: str, preset: str = "mobile", timeout_s: int = 120) -> dict:
@@ -144,6 +150,15 @@ def main() -> int:
         "list_count": snapshot.list_count,
         "short_paragraph_count": snapshot.short_paragraph_count,
         "faq_hint": snapshot.faq_hint,
+        "bot_challenge": snapshot.bot_challenge,
+        "bot_challenge_note": (
+            "The server answered with an anti-bot challenge, not the page. Everything above describes the challenge "
+            "page. Collect the page with a real browser on a residential connection and lower confidence."
+            if snapshot.bot_challenge
+            else ""
+        ),
+        "canonical_check": check_canonical(snapshot.final_url, snapshot.canonical) if snapshot.status_code == 200 else {},
+        "structured_data_invalid_urls": snapshot.invalid_ld_urls,
         "robots_ai": robots_status,
         "llms_txt": llms_status,
         "ai_citation_readiness": ai_readiness,

@@ -85,6 +85,16 @@ Dependendo do pedido, ela também pode devolver:
 - leitura de AI citation readiness
 - resumo `sitewide-lite`
 
+## Novidades da v1.3 (12 de novembro de 2026)
+
+- Página atrás de desafio antirrobô (Cloudflare "Just a moment") não quebra mais o script: ele avisa que leu o desafio e não o conteúdo, e diz quando o próprio `robots.txt` está atrás do desafio. O Google pediu em 11/11 que proteção de CDN libere os robôs verificados.
+- Procura cópias de teste abertas (`hlg.`, `dev.`, `stg.`, `homolog.`...) sem `noindex`. Numa auditoria real de novembro, o Google mostrava uma delas e a IA a citava como "página oficial".
+- Acha canonical em laço (o canonical redireciona de volta para a página) e campos de URL nos dados estruturados que não são URL.
+- Mede a data de atualização do mapa do site: quando a maioria das URLs tem a mesma data, é carimbo de migração, não conteúdo novo.
+- Bloco novo para saúde e produtos regulados: ficha de medicamento, bula em HTML, revisor com registro e o filtro regulatório antes de dar alcance a remédio de prescrição.
+- Calibração de novembro: atualização central do Google em 10/11, novo modelo no Modo IA (12/11), bloco de "páginas oficiais" em teste, novas marcações do Bing para resposta e treino, OpenAI aderindo ao sinal único de treino.
+- Como amostrar respostas de IA (Google, Modo IA, ChatGPT e Perplexity) como evidência datada.
+
 ## Novidades da v1.2 (30 de outubro de 2026)
 
 - Mais robôs de busca de IA no `robots.txt`: Applebot (Siri, Spotlight e Safari; segue as regras do Googlebot quando não é citado), Amzn-SearchBot (Alexa) e meta-webindexer (Meta AI). Robôs de treino da Amazon e da Meta entram na lista de decisão de negócio.

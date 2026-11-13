@@ -8,6 +8,10 @@ This skill now treats AI search readiness as a practical layer inside the audit,
 - the training opt-out group `User-agent: __usage_ai-training`, reported as a business decision
 - page-level `noindex` and Bing `ai-grounding:disallow` (meta robots or `X-Robots-Tag`)
 - whether the site sits behind Cloudflare, whose AI-crawler "Block" also blocks Googlebot since 15/09/2026
+- whether the page or robots.txt answers with an anti-bot challenge instead of content
+- staging copies (`hlg.`, `dev.`, `stg.`...) that answer in public without `noindex`
+- canonicals that redirect back to the page (loops) and structured-data URL fields that are not URLs
+- how sitemap `lastmod` dates spread (one date on most URLs is a bulk stamp)
 - images without `alt`, and content photos with an empty one
 - author and date declared in structured data (articles)
 - quoteable short paragraph blocks
@@ -56,6 +60,9 @@ Use it as:
 - `ai-grounding:disallow` on a page that should appear in Copilot
 - Cloudflare "Block" enabled for AI crawlers (it takes Googlebot with it)
 - the site excluded from "Search generative AI" in Search Console
+- robots.txt or the page behind an anti-bot challenge
+- a staging copy indexed or open to indexing
+- the same product published on two of the company's domains, each canonical to itself
 
 ## About llms.txt
 

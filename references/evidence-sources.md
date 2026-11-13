@@ -39,6 +39,14 @@ Useful examples:
 - Crawl or corpus APIs
   Use when the user wants broader mention visibility or retrieval-surface research.
 
+## Sampling AI Answers
+
+When the user wants GEO evidence, ask the same questions to Google (organic + AI Overview), Google AI Mode, ChatGPT and Perplexity from the target country and language, and record the cited domains per engine. Label it as a dated sample: answers vary between runs. A SERP API with AI add-ons does this in one run; budget it before running, because AI-engine add-ons cost far more than the plain SERP.
+
+## Pages Behind an Anti-Bot Challenge
+
+If `bot_challenge` is true, the scripts parsed the challenge page, not the content. Re-collect with a real browser on a residential connection (a browser automation service with residential proxies in the target country works). Do not score on the challenge page.
+
 ## Source Handling Rules
 
 - Never merge inferred metrics with source-backed metrics as if they were the same thing.

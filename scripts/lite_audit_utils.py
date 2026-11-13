@@ -4,15 +4,16 @@
 from __future__ import annotations
 
 from collections import Counter
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from html.parser import HTMLParser
 from urllib.parse import urljoin, urlparse
-from urllib.request import Request, urlopen
+from urllib.request import HTTPRedirectHandler, Request, build_opener, urlopen
 from urllib.error import HTTPError, URLError
 from urllib.robotparser import RobotFileParser
 
 import json
 import re
+import socket
 
 
 USER_AGENT = (
@@ -57,6 +58,8 @@ class PageSnapshot:
     images_missing_alt: int = 0
     images_empty_alt: int = 0
     robots_directives: list[str] | None = None
+    bot_challenge: bool = False
+    invalid_ld_urls: list[str] = field(default_factory=list)
 
 
 # Crawlers that decide whether a page can show up (and be cited) in a search or answer product.
@@ -96,6 +99,12 @@ AD_BOTS = {
 # One robots.txt group that opts out of AI training across vendors (IETF draft, 30/10/2026).
 # `User-agent: *` does not cover it: only an explicit group counts.
 TRAINING_SIGNAL_AGENT = "__usage_ai-training"
+# Structured-data properties that must hold a URL. A template that writes JSON text or a bare name here
+# breaks the link between the page and the document (seen in Nov 2026: a leaflet `url` holding a JSON string).
+URL_KEYS = ("url", "@id", "contentUrl", "sameAs", "logo")
+# Hostnames that usually serve a staging or test copy of the site.
+STAGING_PREFIXES = ("hlg", "dev", "stg", "staging", "homolog", "hml", "qa", "teste", "test", "beta", "preview")
+CHALLENGE_TITLE = re.compile(r"just a moment|um momento|attention required|access denied|checking your browser", re.I)
 
 
 class AuditHTMLParser(HTMLParser):
@@ -134,6 +143,7 @@ class AuditHTMLParser(HTMLParser):
         self.images_missing_alt = 0
         self.images_empty_alt = 0
         self.robots_directives: list[str] = []
+        self.invalid_ld_urls: list[str] = []
 
     def _read_ldjson(self, raw: str) -> None:
         try:
@@ -158,6 +168,10 @@ class AuditHTMLParser(HTMLParser):
                 self.date_modified = node["dateModified"]
             if isinstance(node.get("datePublished"), str) and not self.date_published:
                 self.date_published = node["datePublished"]
+            for key in URL_KEYS:
+                value = node.get(key)
+                if isinstance(value, str) and value.strip() and not value.strip().startswith(("http://", "https://", "/", "#")):
+                    self.invalid_ld_urls.append(f"{key}: {value.strip()[:90]}")
             stack.extend(value for value in node.values() if isinstance(value, (dict, list)))
 
     def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
@@ -299,13 +313,34 @@ def infer_page_type(url: str, word_count: int) -> str:
     return "landing-page"
 
 
+def is_bot_challenge(status_code: int, headers, html: str = "") -> bool:
+    """True when a CDN answers with an anti-bot challenge instead of the page (Cloudflare, Akamai and the like)."""
+    mitigated = str((headers or {}).get("cf-mitigated", "") or "").lower()
+    if mitigated == "challenge":
+        return True
+    if status_code in (403, 429, 503):
+        head = html[:6000]
+        return bool(CHALLENGE_TITLE.search(head) or "challenge-platform" in head or "_cf_chl_opt" in head)
+    return False
+
+
 def fetch_snapshot(url: str, timeout: int = 20) -> PageSnapshot:
+    """Fetch and parse a page. A 4xx/5xx answer is parsed too, so a challenge page is reported instead of crashing."""
     request = Request(url, headers={"User-Agent": USER_AGENT})
-    with urlopen(request, timeout=timeout) as response:
-        final_url = response.geturl()
-        status_code = getattr(response, "status", 200)
-        x_robots = response.headers.get("X-Robots-Tag", "")
-        html = response.read().decode("utf-8", errors="replace")
+    try:
+        with urlopen(request, timeout=timeout) as response:
+            final_url = response.geturl()
+            status_code = getattr(response, "status", 200)
+            headers = response.headers
+            html = response.read().decode("utf-8", errors="replace")
+    except HTTPError as exc:
+        final_url, status_code, headers = exc.geturl() or url, exc.code, exc.headers or {}
+        try:
+            html = exc.read().decode("utf-8", errors="replace")
+        except Exception:  # pragma: no cover - network behavior
+            html = ""
+    x_robots = (headers or {}).get("X-Robots-Tag", "") or ""
+    challenge = is_bot_challenge(status_code, headers, html)
 
     parser = AuditHTMLParser()
     parser.feed(html)
@@ -341,7 +376,113 @@ def fetch_snapshot(url: str, timeout: int = 20) -> PageSnapshot:
         images_empty_alt=parser.images_empty_alt,
         robots_directives=parser.robots_directives
         + [f"x-robots-tag: {d.strip().lower()}" for d in x_robots.split(",") if d.strip()],
+        bot_challenge=challenge,
+        invalid_ld_urls=parser.invalid_ld_urls,
     )
+
+
+class _NoRedirect(HTTPRedirectHandler):
+    def redirect_request(self, *args, **kwargs):  # noqa: D401 - keep the 3xx visible
+        return None
+
+
+def check_canonical(final_url: str, canonical: str, timeout: int = 10) -> dict:
+    """Follow one hop from the canonical. A canonical that redirects back to the page is a loop: both URLs cancel out."""
+    if not canonical:
+        return {"canonical": "", "self": False, "loop": False, "note": "no canonical"}
+    target = urljoin(final_url, canonical)
+    if target.rstrip("/") == final_url.rstrip("/"):
+        return {"canonical": target, "self": True, "loop": False}
+    opener = build_opener(_NoRedirect)
+    status, location = 0, ""
+    try:
+        with opener.open(Request(target, headers={"User-Agent": USER_AGENT}), timeout=timeout) as response:
+            status = getattr(response, "status", 200)
+    except HTTPError as exc:
+        status, location = exc.code, urljoin(target, (exc.headers or {}).get("Location", "") or "")
+    except URLError:
+        status = 0
+    def bare(u: str) -> str:  # compare without scheme and trailing slash; path case matters
+        return re.sub(r"^https?://", "", u).rstrip("/")
+
+    loop = 300 <= status < 400 and bare(location) == bare(final_url)
+    return {"canonical": target, "self": False, "status": status, "redirects_to": location, "loop": loop}
+
+
+def probe_staging_hosts(url: str, timeout: int = 8) -> list[dict]:
+    """Look for staging copies (hlg., dev., stg. ...) that answer in public and do not say noindex."""
+    host = urlparse(url).netloc.split(":")[0]
+    base = host[4:] if host.startswith("www.") else host
+    found = []
+    for prefix in STAGING_PREFIXES:
+        name = f"{prefix}.{base}"
+        try:
+            socket.gethostbyname(name)
+        except OSError:
+            continue
+        item = {"host": name, "status": 0, "open": False}
+        try:
+            snap = fetch_snapshot(f"https://{name}/", timeout=timeout)
+            noindex = any(d.endswith(("noindex", "none")) for d in snap.robots_directives or [])
+            item.update(
+                status=snap.status_code,
+                bot_challenge=snap.bot_challenge,
+                noindex=noindex,
+                canonical=snap.canonical,
+                open=snap.status_code == 200 and not noindex and not snap.bot_challenge,
+            )
+        except Exception as exc:  # pragma: no cover - network behavior
+            item["error"] = str(exc)[:120]
+        found.append(item)
+    return found
+
+
+def sitemap_profile(url: str, timeout: int = 20) -> dict:
+    """Count sitemap URLs and how their lastmod dates spread. One date on most URLs means a bulk stamp, not freshness."""
+    parsed = urlparse(url)
+    root = f"{parsed.scheme}://{parsed.netloc}"
+    candidates = []
+    try:
+        with urlopen(Request(root + "/robots.txt", headers={"User-Agent": USER_AGENT}), timeout=timeout) as response:
+            for line in response.read().decode("utf-8", errors="replace").splitlines():
+                if line.lower().startswith("sitemap:"):
+                    candidates.append(line.split(":", 1)[1].strip())
+    except Exception:  # pragma: no cover - network behavior
+        pass
+    candidates = candidates or [root + "/sitemap.xml"]
+    urls, lastmods, fetched, errors = 0, Counter(), [], []
+    queue = list(candidates)
+    while queue and len(fetched) < 6:
+        sm = queue.pop(0)
+        try:
+            with urlopen(Request(sm, headers={"User-Agent": USER_AGENT}), timeout=timeout) as response:
+                xml = response.read().decode("utf-8", errors="replace")
+        except HTTPError as exc:
+            errors.append(f"{sm} -> {exc.code}")
+            continue
+        except Exception as exc:  # pragma: no cover - network behavior
+            errors.append(f"{sm} -> {exc}")
+            continue
+        fetched.append(sm)
+        if "<sitemapindex" in xml:
+            queue.extend(re.findall(r"<loc>\s*(.*?)\s*</loc>", xml))
+            continue
+        for block in re.findall(r"<url>(.*?)</url>", xml, re.S):
+            urls += 1
+            match = re.search(r"<lastmod>\s*(\d{4}-\d{2}-\d{2})", block)
+            lastmods[match.group(1) if match else "none"] += 1
+    dated = sum(v for k, v in lastmods.items() if k != "none")
+    top_date, top_count = next(((k, v) for k, v in lastmods.most_common() if k != "none"), ("", 0))
+    share = round(top_count / dated, 2) if dated else 0.0
+    return {
+        "sitemaps": fetched,
+        "errors": errors,
+        "urls": urls,
+        "with_lastmod": dated,
+        "top_lastmod": top_date,
+        "top_lastmod_share": share,
+        "bulk_lastmod": dated >= 50 and share >= 0.5,
+    }
 
 
 def normalize_internal_links(base_url: str, links: list[str]) -> list[str]:
@@ -412,6 +553,7 @@ def fetch_robots_ai_status(url: str, timeout: int = 10) -> dict:
     robots_url = f"{parsed.scheme}://{parsed.netloc}/robots.txt"
     request = Request(robots_url, headers={"User-Agent": USER_AGENT})
     headers = {}
+    challenge_html = ""
     try:
         with urlopen(request, timeout=timeout) as response:
             status_code = getattr(response, "status", 200)
@@ -419,8 +561,13 @@ def fetch_robots_ai_status(url: str, timeout: int = 10) -> dict:
             lines = response.read().decode("utf-8", errors="replace").splitlines()
     except HTTPError as exc:
         status_code, lines, headers = exc.code, [], exc.headers or {}
+        try:
+            challenge_html = exc.read().decode("utf-8", errors="replace")
+        except Exception:  # pragma: no cover - network behavior
+            challenge_html = ""
     except URLError:
         return {"url": robots_url, "present": False, "status_code": 0, "note": "robots.txt could not be fetched"}
+    behind_challenge = status_code >= 400 and is_bot_challenge(status_code, headers, challenge_html)
 
     rules = RobotFileParser()
     rules.parse(lines)
@@ -462,6 +609,13 @@ def fetch_robots_ai_status(url: str, timeout: int = 10) -> dict:
             "present": signal_present,
             "training_allowed": rules.can_fetch(TRAINING_SIGNAL_AGENT, target) if signal_present else None,
         },
+        "behind_challenge": behind_challenge,
+        "behind_challenge_note": (
+            "robots.txt itself answers with an anti-bot challenge: crawlers outside the CDN's verified list cannot read "
+            "the rules or the sitemap. Google (11/11/2026) says generic bot protection breaks crawling; allow verified bots."
+            if behind_challenge
+            else ""
+        ),
         "cloudflare": {
             "proxied": bool(headers and (headers.get("CF-RAY") or server == "cloudflare")),
             "bot_preference_sync": "BEGIN Cloudflare Bot Preference Sync" in text,
